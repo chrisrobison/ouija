@@ -123,7 +123,8 @@
       addMessage('question', question);
       try {
         const resp = await fetch('ouija.php?q=' + encodeURIComponent(question));
-        const answer = (await resp.text()).trim();
+        const raw = (await resp.text()).trim();
+        const answer = raw.replace(/[^A-Za-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
         await ask(answer);
         addMessage('response', answer);
       } catch (err) {
@@ -140,13 +141,22 @@
     }
 
     async function ask(text='') {
-      const input = text.toUpperCase().split('');
-      for (const char of input) {
-        const target = letterPositions[char] || letterPositions[" "];
-        await moveTo(...target);
+      const tokens = text.toUpperCase().split(/\s+/).filter(t => t);
+      for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+        if (token === 'YES' || token === 'NO' || token === 'GOODBYE') {
+          await moveTo(...letterPositions[token]);
+        } else {
+          for (const char of token.split('')) {
+            const target = letterPositions[char] || letterPositions[' '];
+            await moveTo(...target);
+          }
+        }
+        if (i < tokens.length - 1) {
+          await moveTo(...letterPositions[' ']);
+        }
       }
-      // End at GOODBYE
-      await moveTo(...letterPositions["GOODBYE"]);
+      await moveTo(...letterPositions['GOODBYE']);
     }
   </script>
   <script>
