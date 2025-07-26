@@ -124,7 +124,11 @@
       try {
         const resp = await fetch('ouija.php?q=' + encodeURIComponent(question));
         const raw = (await resp.text()).trim();
-        const answer = raw.replace(/[^A-Za-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+        let answer = raw.replace(/[^A-Za-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+        if (raw.includes('<<RESET>>')) {
+          await fetch('ouija.php?action=reset');
+          answer = 'HELLO';
+        }
         await ask(answer);
         addMessage('response', answer);
       } catch (err) {
