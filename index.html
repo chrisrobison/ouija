@@ -119,12 +119,23 @@
       convo.scrollTop = convo.scrollHeight;
     }
 
+    async function askOuija(question) {
+      addMessage('question', question);
+      try {
+        const resp = await fetch('ouija.php?q=' + encodeURIComponent(question));
+        const answer = (await resp.text()).trim();
+        await ask(answer);
+        addMessage('response', answer);
+      } catch (err) {
+        console.error('Ouija request failed:', err);
+      }
+    }
+
     async function startAnimation() {
       const msgInput = document.getElementById('message');
       const text = msgInput.value.trim();
       if (!text) return;
-      addMessage('question', text);
-      await ask(text);
+      await askOuija(text);
       msgInput.value = '';
     }
 
@@ -136,7 +147,6 @@
       }
       // End at GOODBYE
       await moveTo(...letterPositions["GOODBYE"]);
-      if (text) addMessage('response', text);
     }
   </script>
   <script>
@@ -196,12 +206,10 @@
     const text = buffer.trim();
     if (!text) return;
 
-    if (typeof window.ask === 'function') {
-      window.ask(text);
-    } else if (window.board?.say) {
-      window.board.say(text);
+    if (typeof window.askOuija === 'function') {
+      window.askOuija(text);
     } else {
-      console.warn('Hook this up to your Ouija display fn:', text);
+      console.warn('Ouija handler not available:', text);
     }
     buffer = '';
   }
