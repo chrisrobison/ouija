@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ouija Coordinate Logger</title>
+  <style>
+    body {
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #fff;
+      font-family: sans-serif;
+    }
+    #board-container {
+      position: relative;
+      background: url('ouijaboard.jpeg') no-repeat center/contain;
+      width: 900px;
+      height: 600px;
+      margin-top: 20px;
+      border: 2px solid #666;
+    }
+    #coords {
+      margin-top: 10px;
+      font-size: 1.1em;
+    }
+    #marker {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: red;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    #log {
+      width: 800px;
+      margin-top: 20px;
+      background: #111;
+      padding: 10px;
+      border: 1px solid #333;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Press a key, then click the corresponding spot on the board</h2>
+
+<div id="board-container"></div>
+<div id="coords">Waiting for key press...</div>
+<div id="log">// Logged coordinates will appear here</div>
+
+<script>
+  const container = document.getElementById('board-container');
+  const coords = document.getElementById('coords');
+  const log = document.getElementById('log');
+
+  const marker = document.createElement('div');
+  marker.id = 'marker';
+  container.appendChild(marker);
+
+  let currentKey = null;
+  let mappings = {};
+
+  document.addEventListener('keydown', e => {
+    currentKey = e.key.toUpperCase();
+    coords.innerText = `Ready to map: "${currentKey}" — click the board`;
+  });
+
+  container.addEventListener('click', e => {
+    if (!currentKey) {
+      coords.innerText = `⚠️ Press a key first!`;
+      return;
+    }
+
+    const rect = container.getBoundingClientRect();
+    const x = Math.round(e.clientX - rect.left);
+    const y = Math.round(e.clientY - rect.top);
+
+    marker.style.left = `${x - 5}px`;
+    marker.style.top = `${y - 5}px`;
+
+    mappings[currentKey] = [x, y];
+    coords.innerText = `Mapped "${currentKey}" to [${x}, ${y}]`;
+
+    log.innerText = JSON.stringify(mappings, null, 2);
+    console.log(`"${currentKey}": [${x}, ${y}],`);
+
+    currentKey = null;
+  });
+</script>
+
+</body>
+</html>
