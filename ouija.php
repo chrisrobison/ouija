@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // ---------------------------
 // CONFIG
 // ---------------------------
-$API_KEY      = getenv('DEEPSEEK_API_KEY') ?: 'sk-7630ee9950b940aa87c012c5352ef4c5';
+$API_KEY      = getenv('DEEPSEEK_API_KEY') ?: '';
 $MODEL        = 'deepseek-chat';           // or deepseek-reasoner
 $TEMPERATURE  = 0.2;
 $MAX_TOKENS   = 512;
