@@ -50,7 +50,8 @@
     #planchette {
       position: absolute;
       width: 200px;
-      pointer-events: none;
+      pointer-events: auto;
+      cursor: pointer;
       transition: top 0.8s ease, left 0.8s ease;
       z-index: 10;
     }
@@ -151,6 +152,23 @@
   rec.continuous = true;
   rec.interimResults = true;
 
+  const planchetteEl = document.getElementById('planchette');
+  let listening = false;
+
+  function startListening() {
+    listening = true;
+    try { rec.start(); } catch (_) {}
+  }
+
+  function stopListening() {
+    listening = false;
+    try { rec.stop(); } catch (_) {}
+  }
+
+  planchetteEl.addEventListener('pointerdown', startListening);
+  planchetteEl.addEventListener('pointerup', stopListening);
+  planchetteEl.addEventListener('pointerleave', stopListening);
+
   let buffer = '';
   let lastFinalAt = 0;
   const FLUSH_AFTER_MS = 1200; // send after ~1.2s of silence
@@ -169,8 +187,9 @@
   };
 
   rec.onend = () => {
-    // keep it running
-    try { rec.start(); } catch (_) {}
+    if (listening) {
+      try { rec.start(); } catch (_) {}
+    }
   };
 
   function flush() {
@@ -192,7 +211,6 @@
     if (buffer && Date.now() - lastFinalAt > FLUSH_AFTER_MS) flush();
   }, 500);
 
-  try { rec.start(); } catch (e) { console.error(e); }
 })();
 </script>
 
