@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Web Ouija Board</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: black;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: sans-serif;
+    }
+
+    #board-container {
+      position: relative;
+      width: 900px;
+      height: 600px;
+      background: url('ouijaboard.jpeg') no-repeat center/contain;
+      margin-top: 20px;
+    }
+
+    #planchette {
+      position: absolute;
+      width: 200px;
+      pointer-events: none;
+      transition: top 0.8s ease, left 0.8s ease;
+      z-index: 10;
+    }
+
+    #controls {
+      margin-top: 20px;
+    }
+
+    input[type="text"] {
+      font-size: 1.2em;
+      padding: 5px;
+    }
+
+    button {
+      font-size: 1em;
+      padding: 5px 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="controls">
+    <input type="text" id="message" placeholder="Type your message">
+    <button onclick="startAnimation()">Ask</button>
+  </div>
+
+  <div id="board-container">
+    <img src="planchette.png" id="planchette" style="top: 520px; left: 450px;">
+  </div>
+
+  <script>
+    const letterPositions = {
+      "0": [666, 437], "1": [237, 437], "2": [280, 439], "3": [329, 441],
+      "4": [374, 445], "5": [426, 444], "6": [474, 436], "7": [517, 438],
+      "8": [565, 439], "9": [612, 437], "A": [142, 288], "B": [201, 255],
+      "C": [247, 234], "D": [295, 220], "E": [350, 211], "F": [388, 206],
+      "G": [443, 196], "H": [501, 208], "I": [548, 212], "J": [595, 219],
+      "K": [640, 231], "L": [689, 254], "M": [750, 283], "N": [159, 375],
+      "O": [200, 356], "P": [254, 334], "Q": [292, 322], "R": [343, 308],
+      "S": [392, 299], "T": [440, 297], "U": [489, 303], "V": [544, 302],
+      "W": [609, 312], "X": [662, 332], "Y": [709, 352], "Z": [759, 376],
+      "YES": [232, 98], "NO": [664, 96], "GOODBYE": [453, 520], " ": [456, 362]
+    };
+
+    const planchette = document.getElementById('planchette');
+
+    async function moveTo(x, y) {
+      const width = 200;
+      const height = 200;
+      planchette.style.left = `${x - width / 2}px`;
+      planchette.style.top = `${y - height / 2}px`;
+      return new Promise(resolve => setTimeout(resolve, 850));
+    }
+
+    async function startAnimation() {
+      const input = document.getElementById('message').value.toUpperCase().split('');
+      for (const char of input) {
+        const target = letterPositions[char] || letterPositions[" "];
+        await moveTo(...target);
+      }
+      // End at GOODBYE
+      await moveTo(...letterPositions["GOODBYE"]);
+    }
+
+    async function ask(text='') {
+      const input = text.toUpperCase().split('');
+      for (const char of input) {
+        const target = letterPositions[char] || letterPositions[" "];
+        await moveTo(...target);
+      }
+      // End at GOODBYE
+      await moveTo(...letterPositions["GOODBYE"]);
+    }
+  </script>
+  <script>
+(() => {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) {
+    console.warn('Web Speech API not supported.');
+    return;
+  }
+
+  const rec = new Recognition();
+  rec.lang = 'en-US';
+  rec.continuous = true;
+  rec.interimResults = true;
+
+  let buffer = '';
+  let lastFinalAt = 0;
+  const FLUSH_AFTER_MS = 1200; // send after ~1.2s of silence
+
+  rec.onresult = (e) => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) {
+        buffer += (buffer ? ' ' : '') + t.trim();
+        lastFinalAt = Date.now();
+        flush(); // push immediately on final chunks
+      } else {
+        // if you want interim-on-board, you could push here too (probably noisy)
+      }
+    }
+  };
+
+  rec.onend = () => {
+    // keep it running
+    try { rec.start(); } catch (_) {}
+  };
+
+  function flush() {
+    const text = buffer.trim();
+    if (!text) return;
+
+    if (typeof window.ask === 'function') {
+      window.ask(text);
+    } else if (window.board?.say) {
+      window.board.say(text);
+    } else {
+      console.warn('Hook this up to your Ouija display fn:', text);
+    }
+    buffer = '';
+  }
+
+  // safety net: if we got some words but no finals, push after a pause
+  setInterval(() => {
+    if (buffer && Date.now() - lastFinalAt > FLUSH_AFTER_MS) flush();
+  }, 500);
+
+  try { rec.start(); } catch (e) { console.error(e); }
+})();
+</script>
+
+</body>
+</html>
