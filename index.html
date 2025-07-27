@@ -69,9 +69,48 @@
       font-size: 1em;
       padding: 5px 10px;
     }
+
+    #help-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    #help-modal .content {
+      background: #222;
+      border: 1px solid #555;
+      padding: 20px;
+      max-width: 90%;
+      width: 600px;
+    }
+
+    #help-modal button {
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
+
+  <div id="help-modal">
+    <div class="content">
+      <h2>How to Use the Ouija Board</h2>
+      <p>Ask your questions by typing them in the box or by speaking while holding the planchette.</p>
+      <ul>
+        <li>Click and hold the planchette to speak a question.</li>
+        <li>Or type your question and press "Ask".</li>
+        <li>The planchette will move to spell out the spirit's response.</li>
+      </ul>
+      <button id="close-help">Close</button>
+    </div>
+  </div>
 
   <div id="controls">
     <input type="text" id="message" placeholder="Type your message">
@@ -235,6 +274,20 @@
 
 })();
 </script>
+
+  <script>
+    (() => {
+      const modal = document.getElementById('help-modal');
+      const closeBtn = document.getElementById('close-help');
+      if (localStorage.getItem('helpShown')) {
+        modal.style.display = 'none';
+      }
+      closeBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+        localStorage.setItem('helpShown', 'true');
+      });
+    })();
+  </script>
 
 </body>
 </html>
