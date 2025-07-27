@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Web Ouija Board</title>
   <style>
     body {
@@ -23,6 +24,9 @@
       width: 900px;
       height: 600px;
       background: url('ouijaboard.jpeg') no-repeat center/contain;
+      touch-action: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
     }
 
     #conversation {
@@ -54,6 +58,9 @@
       cursor: pointer;
       transition: top 0.8s ease, left 0.8s ease;
       z-index: 10;
+      touch-action: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
     }
 
     #controls {
@@ -68,6 +75,26 @@
     button {
       font-size: 1em;
       padding: 5px 10px;
+    }
+
+    @media (max-width: 600px) {
+      #main {
+        flex-direction: column;
+        align-items: center;
+      }
+      #board-container {
+        width: 95vw;
+        height: calc(95vw * 2 / 3);
+      }
+      #conversation {
+        width: 95vw;
+        height: 200px;
+        margin-left: 0;
+        margin-top: 10px;
+      }
+      #planchette {
+        width: 20vw;
+      }
     }
 
     #help-modal {
@@ -139,12 +166,17 @@
     };
 
     const planchette = document.getElementById('planchette');
+    const board = document.getElementById('board-container');
+
+    board.addEventListener('contextmenu', e => e.preventDefault());
 
     async function moveTo(x, y) {
-      const width = 200;
-      const height = 200;
-      planchette.style.left = `${x - width / 2}px`;
-      planchette.style.top = `${y - height / 2}px`;
+      const scaleX = board.clientWidth / 900;
+      const scaleY = board.clientHeight / 600;
+      const width = planchette.offsetWidth;
+      const height = planchette.offsetHeight;
+      planchette.style.left = `${x * scaleX - width / 2}px`;
+      planchette.style.top = `${y * scaleY - height / 2}px`;
       return new Promise(resolve => setTimeout(resolve, 850));
     }
 
@@ -231,6 +263,8 @@
   planchetteEl.addEventListener('pointerdown', startListening);
   planchetteEl.addEventListener('pointerup', stopListening);
   planchetteEl.addEventListener('pointerleave', stopListening);
+  planchetteEl.addEventListener('contextmenu', e => e.preventDefault());
+  planchetteEl.addEventListener('touchstart', e => e.preventDefault(), {passive: false});
 
   let buffer = '';
   let lastFinalAt = 0;
