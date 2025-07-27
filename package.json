@@ -1,0 +1,17 @@
+{
+  "name": "ouija",
+  "version": "1.0.0",
+  "description": "A virtual ouija board featuring real-time transcription of questions and responses relayed via an animated planchette",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "jest": "^30.0.5",
+    "jsdom": "^26.1.0"
+  }
+}
