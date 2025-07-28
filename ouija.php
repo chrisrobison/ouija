@@ -306,27 +306,28 @@ if ($action === 'ask') {
 
     $spirit = get_current_spirit($API_KEY, $MODEL, $SYSTEM_PROMPT, $TEMPERATURE, $MAX_TOKENS, $SPIRITS_DIR, $CURRENT_FILE);
 
-    // Ensure conversation array
-    if (!isset($spirit['conversation']) || !is_array($spirit['conversation'])) {
-        $spirit['conversation'] = [];
+    // Ensure we start with a valid conversation array
+    $conversation = [];
+    if (isset($spirit['conversation']) && is_array($spirit['conversation'])) {
+        $conversation = $spirit['conversation'];
     }
 
-    // Append user message
-    $spirit['conversation'][] = ['role' => 'user', 'content' => $question];
+    // Record the newest user question
+    $conversation[] = ['role' => 'user', 'content' => $question];
 
-    // Trim to MEM_DEPTH * 2 (user+assistant pairs)
-    if (count($spirit['conversation']) > ($GLOBALS['MEM_DEPTH'] * 2)) {
-        $spirit['conversation'] = array_slice($spirit['conversation'], -($GLOBALS['MEM_DEPTH'] * 2));
+    // Limit stored history to MEM_DEPTH question/answer pairs
+    if (count($conversation) > ($MEM_DEPTH * 2)) {
+        $conversation = array_slice($conversation, -($MEM_DEPTH * 2));
     }
 
-    // Build full message array: system + profile + recent memory + current user
+    // Build full message array: system prompt, profile, and recent history
     $messages = [
         ['role' => 'system', 'content' => $SYSTEM_PROMPT],
         ['role' => 'system', 'content' => "Spirit Profile:\n" . json_encode($spirit['profile'], JSON_UNESCAPED_UNICODE)]
     ];
 
     // include recent conversation
-    foreach ($spirit['conversation'] as $m) {
+    foreach ($conversation as $m) {
         $role = $m['role'] === 'assistant' ? 'assistant' : 'user';
         $messages[] = ['role' => $role, 'content' => $m['content']];
     }
@@ -349,10 +350,14 @@ if ($action === 'ask') {
         $response = clean_output($response);
     }
 
-    // Append assistant reply to memory
-    $spirit['conversation'][] = ['role' => 'assistant', 'content' => $response];
+    // Store assistant response in history
+    $conversation[] = ['role' => 'assistant', 'content' => $response];
+    if (count($conversation) > ($MEM_DEPTH * 2)) {
+        $conversation = array_slice($conversation, -($MEM_DEPTH * 2));
+    }
 
-    // Save spirit back before potentially resetting
+    // Persist updated conversation
+    $spirit['conversation'] = $conversation;
     save_spirit($SPIRITS_DIR, $spirit);
 
     if ($resetToken) {
