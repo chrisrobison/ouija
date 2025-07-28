@@ -306,11 +306,6 @@ if ($action === 'ask') {
     // Append user message
     $spirit['conversation'][] = ['role' => 'user', 'content' => $question];
 
-    // Trim to MEM_DEPTH * 2 (user+assistant pairs)
-    if (count($spirit['conversation']) > ($GLOBALS['MEM_DEPTH'] * 2)) {
-        $spirit['conversation'] = array_slice($spirit['conversation'], -($GLOBALS['MEM_DEPTH'] * 2));
-    }
-
     // Build full message array: system + profile + recent memory + current user
     $messages = [
         ['role' => 'system', 'content' => $SYSTEM_PROMPT],
@@ -343,6 +338,14 @@ if ($action === 'ask') {
 
     // Append assistant reply to memory
     $spirit['conversation'][] = ['role' => 'assistant', 'content' => $response];
+
+    // Trim to MEM_DEPTH * 2 (user+assistant pairs)
+    if (count($spirit['conversation']) > ($GLOBALS['MEM_DEPTH'] * 2)) {
+        $spirit['conversation'] = array_slice(
+            $spirit['conversation'],
+            -($GLOBALS['MEM_DEPTH'] * 2)
+        );
+    }
 
     // Save spirit back before potentially resetting
     save_spirit($SPIRITS_DIR, $spirit);
