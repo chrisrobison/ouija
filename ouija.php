@@ -310,11 +310,24 @@ if ($action === 'ask') {
 
     $response = clean_output($response);
 
+    // Check for special tokens indicating a new spirit should be summoned
+    $resetToken = false;
+    if (strpos($response, '<<NEW_SPIRIT>>') !== false || strpos($response, '<<RESET>>') !== false) {
+        $resetToken = true;
+        $response = str_replace(['<<NEW_SPIRIT>>', '<<RESET>>'], '', $response);
+        $response = clean_output($response);
+    }
+
     // Append assistant reply to memory
     $spirit['conversation'][] = ['role' => 'assistant', 'content' => $response];
 
-    // Save spirit back
+    // Save spirit back before potentially resetting
     save_spirit($SPIRITS_DIR, $spirit);
+
+    if ($resetToken) {
+        // Create and load a new spirit for subsequent requests
+        $spirit = summon_new_spirit($API_KEY, $MODEL, $SYSTEM_PROMPT, $TEMPERATURE, $MAX_TOKENS, $SPIRITS_DIR, $CURRENT_FILE);
+    }
 
     // Output only the spirit's answer
     echo $response;
