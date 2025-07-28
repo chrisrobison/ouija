@@ -38,6 +38,8 @@ if (!is_dir($SPIRITS_DIR)) {
     mkdir($SPIRITS_DIR, 0755, true);
 }
 
+cleanup_spirits_dir($SPIRITS_DIR);
+
 // ---------------------------
 // INPUTS
 // ---------------------------
@@ -123,10 +125,31 @@ function save_current_spirit_name($CURRENT_FILE, $name) {
     file_put_contents($CURRENT_FILE, $name);
 }
 
+function is_valid_spirit($data) {
+    return is_array($data)
+        && isset($data['_id'], $data['profile'], $data['conversation'])
+        && is_array($data['conversation']);
+}
+
+function cleanup_spirits_dir($SPIRITS_DIR) {
+    foreach (glob("$SPIRITS_DIR/*.json") as $file) {
+        $data = json_decode(file_get_contents($file), true);
+        if (!is_valid_spirit($data)) {
+            @unlink($file);
+        }
+    }
+}
+
 function load_spirit($SPIRITS_DIR, $name) {
     $path = "$SPIRITS_DIR/$name.json";
     if (!file_exists($path)) return null;
-    return json_decode(file_get_contents($path), true);
+    $data = json_decode(file_get_contents($path), true);
+    if (!is_valid_spirit($data)) {
+        // remove invalid file to avoid future mismatches
+        @unlink($path);
+        return null;
+    }
+    return $data;
 }
 
 function save_spirit($SPIRITS_DIR, $spirit) {
