@@ -21,14 +21,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// Get .env data 
+$ENV = [];
+$lines = preg_split("/\n/", file_get_contents(".env"));
+foreach ($lines as $line) {
+    list($key, $val) = preg_split("/=/", $line, 2);
+    $ENV[$key] = $val;
+}
+
 // ---------------------------
 // CONFIG
 // ---------------------------
-$API_KEY      = getenv('DEEPSEEK_API_KEY') ?: '';
+$API_KEY      = getenv('DEEPSEEK_API_KEY') ?: $ENV['DEEPSEEK_API_KEY'];
 $MODEL        = 'deepseek-chat';           // or deepseek-reasoner
 $TEMPERATURE  = 0.2;
 $MAX_TOKENS   = 512;
-$MEM_DEPTH    = 20;                        // how many turns to keep in memory
+$MEM_DEPTH    = 30;                        // how many turns to keep in memory
 
 $BASE_DIR     = __DIR__;
 $SPIRITS_DIR  = $BASE_DIR . '/spirits';
