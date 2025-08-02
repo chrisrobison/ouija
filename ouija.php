@@ -101,8 +101,10 @@ function deepseek_chat($apiKey, $model, $messages, $temperature, $maxTokens) {
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => json_encode($payload),
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 60,
+        CURLOPT_TIMEOUT        => 120,
     ]);
+    
+    file_put_contents("spirits/ai.log", json_encode($payload), FILE_APPEND);
 
     $resp = curl_exec($ch);
     if ($resp === false) {
