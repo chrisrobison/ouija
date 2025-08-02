@@ -54,6 +54,8 @@
     #planchette {
       position: absolute;
       width: 200px;
+      top: 100px;
+      left: 50%;
       pointer-events: auto;
       cursor: pointer;
       transition: top 0.8s ease, left 0.8s ease;
@@ -146,7 +148,7 @@
 
   <div id="main">
     <div id="board-container">
-      <img src="planchette.png" id="planchette" style="top: 520px; left: 450px;">
+      <img src="planchette.png" id="planchette">
     </div>
     <div id="conversation"></div>
   </div>
@@ -168,6 +170,19 @@
     const planchette = document.getElementById('planchette');
     const board = document.getElementById('board-container');
 
+    window.addEventListener('load', () => {
+      // Default to GOODBYE position (center-bottom of board)
+      const [x, y] = letterPositions['GOODBYE'];
+
+      const scaleX = board.clientWidth / 900;
+      const scaleY = board.clientHeight / 600;
+      const width = planchette.offsetWidth;
+      const height = planchette.offsetHeight;
+
+      planchette.style.left = `${x * scaleX - width / 2}px`;
+      planchette.style.top = `${((y * scaleY - height) / 2) }px`;
+    });
+
     board.addEventListener('contextmenu', e => e.preventDefault());
 
     async function moveTo(x, y) {
@@ -175,10 +190,16 @@
       const scaleY = board.clientHeight / 600;
       const width = planchette.offsetWidth;
       const height = planchette.offsetHeight;
-      planchette.style.left = `${x * scaleX - width / 2}px`;
-      planchette.style.top = `${y * scaleY - height / 2}px`;
+
+      const holeOffsetX = 100; // adjust as needed
+      const holeOffsetY = 100;
+
+      planchette.style.left = `${x * scaleX - holeOffsetX * (scaleX)}px`;
+      planchette.style.top = `${y * scaleY - holeOffsetY * (scaleY)}px`;
+
       return new Promise(resolve => setTimeout(resolve, 850));
     }
+
 
     const convo = document.getElementById('conversation');
 
@@ -321,7 +342,9 @@
         modal.style.display = 'none';
         localStorage.setItem('helpShown', 'true');
       });
+      
     })();
+
   </script>
 
 </body>
