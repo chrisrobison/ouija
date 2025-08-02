@@ -3,22 +3,13 @@
     "profile": {
         "name": "Elias",
         "gender": "male",
-        "birthplace": "Portsmouth",
+        "birthplace": "Vermont",
         "birth_year": 1872,
-        "death_year": 1918,
-        "death_cause": "influenza",
-        "occupation": "shipwright",
+        "death_year": 1934,
+        "death_cause": "pneumonia",
+        "occupation": "blacksmith",
         "children": 3,
-        "note": "Loved the sea"
+        "note": "Loved horses"
     },
-    "conversation": [
-        {
-            "role": "user",
-            "content": "what's your name?"
-        },
-        {
-            "role": "assistant",
-            "content": "Elias."
-        }
-    ]
+    "conversation": []
 }
