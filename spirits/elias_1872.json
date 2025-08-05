@@ -1,0 +1,15 @@
+{
+    "_id": "elias_1872",
+    "profile": {
+        "name": "Elias",
+        "gender": "male",
+        "birthplace": "Vermont",
+        "birth_year": 1872,
+        "death_year": 1934,
+        "death_cause": "pneumonia",
+        "occupation": "blacksmith",
+        "children": 3,
+        "note": "Loved horses"
+    },
+    "conversation": []
+}

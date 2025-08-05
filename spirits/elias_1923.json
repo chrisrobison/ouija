@@ -1,0 +1,24 @@
+{
+    "_id": "elias_1923",
+    "profile": {
+        "name": "Elias",
+        "gender": "male",
+        "birthplace": "Portland",
+        "birth_year": 1923,
+        "death_year": 1987,
+        "death_cause": "heart attack",
+        "occupation": "mechanic",
+        "children": 2,
+        "note": "loved jazz music"
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "what year did you"
+        },
+        {
+            "role": "assistant",
+            "content": "die"
+        }
+    ]
+}

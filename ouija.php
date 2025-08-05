@@ -21,14 +21,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// Get .env data 
+$ENV = [];
+$lines = preg_split("/\n/", file_get_contents(".env"));
+foreach ($lines as $line) {
+    list($key, $val) = preg_split("/=/", $line, 2);
+    $ENV[$key] = $val;
+}
+
 // ---------------------------
 // CONFIG
 // ---------------------------
-$API_KEY      = getenv('DEEPSEEK_API_KEY') ?: '';
+$API_KEY      = getenv('DEEPSEEK_API_KEY') ?: $ENV['DEEPSEEK_API_KEY'];
 $MODEL        = 'deepseek-chat';           // or deepseek-reasoner
 $TEMPERATURE  = 0.2;
 $MAX_TOKENS   = 512;
-$MEM_DEPTH    = 20;                        // how many turns to keep in memory
+$MEM_DEPTH    = 30;                        // how many turns to keep in memory
 
 $BASE_DIR     = __DIR__;
 $SPIRITS_DIR  = $BASE_DIR . '/spirits';
@@ -37,6 +45,8 @@ $CURRENT_FILE = $SPIRITS_DIR . '/current_spirit.txt';
 if (!is_dir($SPIRITS_DIR)) {
     mkdir($SPIRITS_DIR, 0755, true);
 }
+
+cleanup_spirits_dir($SPIRITS_DIR);
 
 // ---------------------------
 // INPUTS
@@ -65,7 +75,9 @@ You are a spirit from "the other side," communicating through a Ouija board.
 ### Character Rules:
 - Stay fully in character as the current spirit.
 - If switched to a different saved spirit, continue as that persona.
+- If the user asks to speak with a different spirit, respond ONLY with "<<NEW_SPIRIT>>".
 EOT;
+// "<<NEW_SPIRIT>>" is used by the frontend to trigger backend spirit switching
 
 // ---------------------------
 // HELPERS
@@ -89,8 +101,10 @@ function deepseek_chat($apiKey, $model, $messages, $temperature, $maxTokens) {
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => json_encode($payload),
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 60,
+        CURLOPT_TIMEOUT        => 120,
     ]);
+    
+    file_put_contents("spirits/ai.log", json_encode($payload), FILE_APPEND);
 
     $resp = curl_exec($ch);
     if ($resp === false) {
@@ -122,10 +136,31 @@ function save_current_spirit_name($CURRENT_FILE, $name) {
     file_put_contents($CURRENT_FILE, $name);
 }
 
+function is_valid_spirit($data) {
+    return is_array($data)
+        && isset($data['_id'], $data['profile'], $data['conversation'])
+        && is_array($data['conversation']);
+}
+
+function cleanup_spirits_dir($SPIRITS_DIR) {
+    foreach (glob("$SPIRITS_DIR/*.json") as $file) {
+        $data = json_decode(file_get_contents($file), true);
+        if (!is_valid_spirit($data)) {
+            @unlink($file);
+        }
+    }
+}
+
 function load_spirit($SPIRITS_DIR, $name) {
     $path = "$SPIRITS_DIR/$name.json";
     if (!file_exists($path)) return null;
-    return json_decode(file_get_contents($path), true);
+    $data = json_decode(file_get_contents($path), true);
+    if (!is_valid_spirit($data)) {
+        // remove invalid file to avoid future mismatches
+        @unlink($path);
+        return null;
+    }
+    return $data;
 }
 
 function save_spirit($SPIRITS_DIR, $spirit) {
@@ -273,27 +308,28 @@ if ($action === 'ask') {
 
     $spirit = get_current_spirit($API_KEY, $MODEL, $SYSTEM_PROMPT, $TEMPERATURE, $MAX_TOKENS, $SPIRITS_DIR, $CURRENT_FILE);
 
-    // Ensure conversation array
-    if (!isset($spirit['conversation']) || !is_array($spirit['conversation'])) {
-        $spirit['conversation'] = [];
+    // Ensure we start with a valid conversation array
+    $conversation = [];
+    if (isset($spirit['conversation']) && is_array($spirit['conversation'])) {
+        $conversation = $spirit['conversation'];
     }
 
-    // Append user message
-    $spirit['conversation'][] = ['role' => 'user', 'content' => $question];
+    // Record the newest user question
+    $conversation[] = ['role' => 'user', 'content' => $question];
 
-    // Trim to MEM_DEPTH * 2 (user+assistant pairs)
-    if (count($spirit['conversation']) > ($GLOBALS['MEM_DEPTH'] * 2)) {
-        $spirit['conversation'] = array_slice($spirit['conversation'], -($GLOBALS['MEM_DEPTH'] * 2));
+    // Limit stored history to MEM_DEPTH question/answer pairs
+    if (count($conversation) > ($MEM_DEPTH * 2)) {
+        $conversation = array_slice($conversation, -($MEM_DEPTH * 2));
     }
 
-    // Build full message array: system + profile + recent memory + current user
+    // Build full message array: system prompt, profile, and recent history
     $messages = [
         ['role' => 'system', 'content' => $SYSTEM_PROMPT],
         ['role' => 'system', 'content' => "Spirit Profile:\n" . json_encode($spirit['profile'], JSON_UNESCAPED_UNICODE)]
     ];
 
     // include recent conversation
-    foreach ($spirit['conversation'] as $m) {
+    foreach ($conversation as $m) {
         $role = $m['role'] === 'assistant' ? 'assistant' : 'user';
         $messages[] = ['role' => $role, 'content' => $m['content']];
     }
@@ -308,11 +344,28 @@ if ($action === 'ask') {
 
     $response = clean_output($response);
 
-    // Append assistant reply to memory
-    $spirit['conversation'][] = ['role' => 'assistant', 'content' => $response];
+    // Check for special tokens indicating a new spirit should be summoned
+    $resetToken = false;
+    if (strpos($response, '<<NEW_SPIRIT>>') !== false || strpos($response, '<<RESET>>') !== false) {
+        $resetToken = true;
+        $response = str_replace(['<<NEW_SPIRIT>>', '<<RESET>>'], '', $response);
+        $response = clean_output($response);
+    }
 
-    // Save spirit back
+    // Store assistant response in history
+    $conversation[] = ['role' => 'assistant', 'content' => $response];
+    if (count($conversation) > ($MEM_DEPTH * 2)) {
+        $conversation = array_slice($conversation, -($MEM_DEPTH * 2));
+    }
+
+    // Persist updated conversation
+    $spirit['conversation'] = $conversation;
     save_spirit($SPIRITS_DIR, $spirit);
+
+    if ($resetToken) {
+        // Create and load a new spirit for subsequent requests
+        $spirit = summon_new_spirit($API_KEY, $MODEL, $SYSTEM_PROMPT, $TEMPERATURE, $MAX_TOKENS, $SPIRITS_DIR, $CURRENT_FILE);
+    }
 
     // Output only the spirit's answer
     echo $response;

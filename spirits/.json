@@ -9,5 +9,15 @@
         "Personal Detail: Loved carving wooden toys for his kids."
     ],
     "occupation": "Blacksmith",
-    "children": "3"
+    "children": "3",
+    "conversation": [
+        {
+            "role": "user",
+            "content": "Hello."
+        },
+        {
+            "role": "assistant",
+            "content": "H... E... L... L... O..."
+        }
+    ]
 }
