@@ -103,10 +103,13 @@ function deepseek_chat($apiKey, $model, $messages, $temperature, $maxTokens) {
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 120,
     ]);
-    
-    file_put_contents("spirits/ai.log", json_encode($payload), FILE_APPEND);
+
+    error_log("DEBUG: Making DeepSeek API request");
+    file_put_contents("spirits/ai.log", date('Y-m-d H:i:s') . " REQUEST: " . json_encode($payload) . "\n", FILE_APPEND);
 
     $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    
     if ($resp === false) {
         $err = curl_error($ch);
         curl_close($ch);
@@ -114,9 +117,12 @@ function deepseek_chat($apiKey, $model, $messages, $temperature, $maxTokens) {
     }
     curl_close($ch);
 
+    error_log("DEBUG: DeepSeek API response code: $httpCode");
+    file_put_contents("spirits/ai.log", date('Y-m-d H:i:s') . " RESPONSE ($httpCode): " . $resp . "\n", FILE_APPEND);
+
     $data = json_decode($resp, true);
     if (!isset($data['choices'][0]['message']['content'])) {
-        throw new Exception("DeepSeek bad response: " . $resp);
+        throw new Exception("DeepSeek bad response (HTTP $httpCode): " . $resp);
     }
     return $data['choices'][0]['message']['content'];
 }
@@ -130,10 +136,6 @@ function slugify($str) {
 
 function load_current_spirit_name($CURRENT_FILE) {
     return file_exists($CURRENT_FILE) ? trim(file_get_contents($CURRENT_FILE)) : null;
-}
-
-function save_current_spirit_name($CURRENT_FILE, $name) {
-    file_put_contents($CURRENT_FILE, $name);
 }
 
 function is_valid_spirit($data) {
@@ -166,39 +168,73 @@ function load_spirit($SPIRITS_DIR, $name) {
 function save_spirit($SPIRITS_DIR, $spirit) {
     $name = $spirit['_id'];
     $path = "$SPIRITS_DIR/$name.json";
-    file_put_contents($path, json_encode($spirit, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    $result = file_put_contents($path, json_encode($spirit, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    if ($result === false) {
+        throw new Exception("Failed to save spirit file: $path");
+    }
+    error_log("DEBUG: Saved spirit to: $path");
+}
+
+function save_current_spirit_name($CURRENT_FILE, $name) {
+    $result = file_put_contents($CURRENT_FILE, $name);
+    if ($result === false) {
+        throw new Exception("Failed to save current spirit file: $CURRENT_FILE");
+    }
+    error_log("DEBUG: Set current spirit to: $name");
 }
 
 function summon_new_spirit($API_KEY, $MODEL, $SYSTEM_PROMPT, $TEMPERATURE, $MAX_TOKENS, $SPIRITS_DIR, $CURRENT_FILE) {
-    // Ask DeepSeek for a STRICT JSON profile
+    // Generate randomization elements
+    $eras = ['1800s', '1900s', '1700s', '1600s', 'Medieval times', 'Ancient times', 'Victorian era', 'Renaissance'];
+    $locations = ['England', 'France', 'Germany', 'Italy', 'Spain', 'Ireland', 'Scotland', 'America', 'Russia', 'India', 'China', 'Egypt'];
+    $occupations = ['farmer', 'merchant', 'soldier', 'sailor', 'blacksmith', 'baker', 'weaver', 'scholar', 'artist', 'musician', 'healer', 'priest', 'noble', 'servant'];
+    
+    $randomEra = $eras[array_rand($eras)];
+    $randomLocation = $locations[array_rand($locations)];
+    $randomOccupation = $occupations[array_rand($occupations)];
+    $randomSeed = rand(1000, 9999);
+
+    // Dedicated system prompt for spirit creation only
+    $creationPrompt = <<<EOT
+You are a spirit profile generator. Create unique, historically believable spirit profiles for a Ouija board application.
+
+Each spirit should be:
+- From different time periods and locations
+- Have realistic occupations for their era  
+- Have believable life stories
+- Be completely unique from previous spirits
+- NOT based on famous historical figures
+
+Output ONLY valid minified JSON with no additional text, formatting, or explanation.
+EOT;
+
     $jsonInstruction = <<<JSONPROMPT
-Create a new UNIQUE spirit profile. 
-Respond ONLY as minified JSON and NOTHING ELSE with keys:
-{
-  "name": "...",
-  "gender": "...",
-  "birthplace": "...",
-  "birth_year": 0,
-  "death_year": 0,
-  "death_cause": "...",
-  "occupation": "...",
-  "children": 0,
-  "note": "..."
-}
+Create a completely unique spirit profile. Be maximally creative and varied.
+
+Randomization seed: $randomSeed
+Suggested era: $randomEra
+Suggested location: $randomLocation
+Suggested occupation: $randomOccupation
+
+Use these as loose inspiration but create someone totally unique.
+
+Required JSON format:
+{"name":"...","gender":"...","birthplace":"...","birth_year":0,"death_year":0,"death_cause":"...","occupation":"...","children":0,"note":"..."}
 JSONPROMPT;
 
+    // Use the creation-specific prompt, NOT the main system prompt
     $resp = deepseek_chat(
         $API_KEY,
         $MODEL,
         [
-            ['role' => 'system', 'content' => $SYSTEM_PROMPT],
+            ['role' => 'system', 'content' => $creationPrompt],  // ← Fixed!
             ['role' => 'user',   'content' => $jsonInstruction]
         ],
-        $TEMPERATURE,
+        0.8,  // Higher temperature for variety
         $MAX_TOKENS
     );
 
-    // Try to extract JSON
+    // Rest of your existing code...
     $json = trim($resp);
     // In case model wraps in code fences or adds extra text
     if (preg_match('/\{.*\}/s', $json, $m)) {
@@ -251,30 +287,179 @@ function clean_output($s) {
     return trim($s);
 }
 
+function find_spirit_by_name($SPIRITS_DIR, $searchName) {
+    $searchName = strtolower(trim($searchName));
+    if (empty($searchName)) return null;
+
+    $spirits = [];
+    $exactMatches = [];
+    $partialMatches = [];
+
+    // Load all spirits
+    foreach (glob("$SPIRITS_DIR/*.json") as $file) {
+        $data = json_decode(file_get_contents($file), true);
+        if (!is_valid_spirit($data)) continue;
+
+        $spiritName = strtolower($data['profile']['name']);
+        $spiritId = $data['_id'];
+
+        // Exact match (highest priority)
+        if ($spiritName === $searchName) {
+            $exactMatches[] = ['id' => $spiritId, 'name' => $data['profile']['name'], 'data' => $data];
+        }
+        // Partial match
+        else if (strpos($spiritName, $searchName) !== false || strpos($searchName, $spiritName) !== false) {
+            $partialMatches[] = ['id' => $spiritId, 'name' => $data['profile']['name'], 'data' => $data];
+        }
+    }
+
+    // Return best match
+    if (!empty($exactMatches)) {
+        return $exactMatches[0]; // Return first exact match
+    }
+    if (count($partialMatches) === 1) {
+        return $partialMatches[0]; // Return single partial match
+    }
+    if (count($partialMatches) > 1) {
+        return ['multiple' => $partialMatches]; // Return multiple matches for user to choose
+    }
+
+    return null; // No matches found
+}
+
+
 // ---------------------------
 // ACTIONS
 // ---------------------------
 
-// RESET: silently create a new spirit
+// RESET: create a new spirit with debugging
 if ($action === 'reset') {
-    summon_new_spirit($API_KEY, $MODEL, $SYSTEM_PROMPT, $TEMPERATURE, $MAX_TOKENS, $SPIRITS_DIR, $CURRENT_FILE);
-    exit;
-}
-
-// LIST: list known spirits (plain text)
-if ($action === 'list') {
-    foreach (glob("$SPIRITS_DIR/*.json") as $f) {
-        echo basename($f, '.json'), "\n";
+    try {
+        error_log("DEBUG: Starting reset action");
+        
+        // Check if directories exist and are writable
+        if (!is_dir($SPIRITS_DIR)) {
+            error_log("DEBUG: Creating spirits directory: $SPIRITS_DIR");
+            if (!mkdir($SPIRITS_DIR, 0755, true)) {
+                throw new Exception("Cannot create spirits directory");
+            }
+        }
+        
+        if (!is_writable($SPIRITS_DIR)) {
+            throw new Exception("Spirits directory not writable: $SPIRITS_DIR");
+        }
+        
+        // Check API key
+        if (empty($API_KEY)) {
+            throw new Exception("API key is empty");
+        }
+        
+        error_log("DEBUG: About to summon new spirit");
+        $spirit = summon_new_spirit($API_KEY, $MODEL, $SYSTEM_PROMPT, $TEMPERATURE, $MAX_TOKENS, $SPIRITS_DIR, $CURRENT_FILE);
+        error_log("DEBUG: Spirit created with ID: " . $spirit['_id']);
+        
+        echo "New spirit created: " . $spirit['_id'];
+        
+    } catch (Exception $e) {
+        error_log("DEBUG: Reset failed - " . $e->getMessage());
+        http_response_code(500);
+        echo "Reset failed: " . $e->getMessage();
     }
     exit;
 }
 
-// SWITCH: switch current host spirit by name (slug)
+// LIST: list known spirits with details
+if ($action === 'list') {
+    $spirits = [];
+    foreach (glob("$SPIRITS_DIR/*.json") as $f) {
+        $data = json_decode(file_get_contents($f), true);
+        if (is_valid_spirit($data)) {
+            $spirits[] = $data;
+        }
+    }
+    
+    if (empty($spirits)) {
+        echo "No spirits found";
+        exit;
+    }
+    
+    $current = load_current_spirit_name($CURRENT_FILE);
+    
+    echo "Available spirits:\n\n";
+    foreach ($spirits as $spirit) {
+        $profile = $spirit['profile'];
+        $isCurrent = ($spirit['_id'] === $current) ? " [CURRENT]" : "";
+        
+        echo "• " . $profile['name'] . $isCurrent . "\n";
+        echo "  " . $profile['occupation'] . " from " . $profile['birthplace'] . 
+             " (" . $profile['birth_year'] . "-" . $profile['death_year'] . ")\n";
+        echo "  ID: " . $spirit['_id'] . "\n\n";
+    }
+    exit;
+}
+
+// SWITCH: switch current host spirit by name (partial matching supported)
 if ($action === 'switch') {
-    if ($name === '') exit;
-    $slug = slugify($name);
-    if (file_exists("$SPIRITS_DIR/$slug.json")) {
-        save_current_spirit_name($CURRENT_FILE, $slug);
+    if ($name === '') {
+        echo "Error: No spirit name provided";
+        exit;
+    }
+    
+    $result = find_spirit_by_name($SPIRITS_DIR, $name);
+    
+    if ($result === null) {
+        echo "No spirit found matching '$name'";
+        exit;
+    }
+    
+    if (isset($result['multiple'])) {
+        // Multiple matches found - show options
+        echo "Multiple spirits found matching '$name':\n\n";
+        foreach ($result['multiple'] as $i => $spirit) {
+            $profile = $spirit['data']['profile'];
+            echo ($i + 1) . ". " . $spirit['name'] . 
+                 " (" . $profile['occupation'] . " from " . $profile['birthplace'] . 
+                 ", " . $profile['birth_year'] . "-" . $profile['death_year'] . ")\n";
+        }
+        echo "\nUse exact name to switch to specific spirit.";
+        exit;
+    }
+    
+    // Single match found - switch to it
+    save_current_spirit_name($CURRENT_FILE, $result['id']);
+    echo "Switched to spirit: " . $result['name'];
+    exit;
+}
+
+// SEARCH: find spirits by name
+if ($action === 'search') {
+    if ($name === '') {
+        echo "Error: No search term provided";
+        exit;
+    }
+
+    $result = find_spirit_by_name($SPIRITS_DIR, $name);
+
+    if ($result === null) {
+        echo "No spirits found matching '$name'";
+        exit;
+    }
+
+    if (isset($result['multiple'])) {
+        echo "Found " . count($result['multiple']) . " spirits matching '$name':\n\n";
+        foreach ($result['multiple'] as $spirit) {
+            $profile = $spirit['data']['profile'];
+            echo "• " . $spirit['name'] . "\n";
+            echo "  " . $profile['occupation'] . " from " . $profile['birthplace'] .
+                 " (" . $profile['birth_year'] . "-" . $profile['death_year'] . ")\n";
+            echo "  ID: " . $spirit['id'] . "\n\n";
+        }
+    } else {
+        $profile = $result['data']['profile'];
+        echo "Found: " . $result['name'] . "\n";
+        echo $profile['occupation'] . " from " . $profile['birthplace'] .
+             " (" . $profile['birth_year'] . "-" . $profile['death_year'] . ")\n";
+        echo "ID: " . $result['id'];
     }
     exit;
 }

@@ -1,0 +1,15 @@
+{
+    "_id": "lakshmi_devi_1842",
+    "profile": {
+        "name": "Lakshmi Devi",
+        "gender": "female",
+        "birthplace": "Calcutta, India",
+        "birth_year": 1842,
+        "death_year": 1898,
+        "death_cause": "cholera",
+        "occupation": "sitar player and composer",
+        "children": 3,
+        "note": "Composed over 200 ragas, believed to communicate through musical patterns in séances"
+    },
+    "conversation": []
+}

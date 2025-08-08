@@ -1,0 +1,52 @@
+{
+    "_id": "mary_1892",
+    "profile": {
+        "name": "Mary Peterson",
+        "gender": "female",
+        "birthplace": "Boston",
+        "birth_year": 1892,
+        "death_year": 1927,
+        "death_cause": "childbirth",
+        "occupation": "wife",
+        "children": [
+            { 
+                "name": "William",
+                "age": 12,
+                "birthday": "1915-07-08",
+                "note": "Loves horses and guns"
+            },
+            {
+                "name": "Dorothy",
+                "nickname": "Dot",
+                "age": 8,
+                "birthday": "1919-04-14",
+                "note": "Tomboy. Always wears overalls and plays with bugs."
+            },
+            {
+                "name": "Mary",
+                "age": 4,
+                "birthday": "1923-06-15",
+                "note": "Wanted to grow up to be like Mommy"
+            }
+        ],
+        "note": "loved the ocean. Was a Flapper girl."
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "?"
+        },
+        {
+            "role": "assistant",
+            "content": "Yes."
+        },
+        {
+            "role": "user",
+            "content": "Ellen rhee. Id like to talk to her. Please get her for me. Tell her it's dana"
+        },
+        {
+            "role": "assistant",
+            "content": ""
+        }
+    ]
+}

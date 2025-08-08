@@ -3,13 +3,13 @@
     "profile": {
         "name": "Elias",
         "gender": "male",
-        "birthplace": "Vermont",
+        "birthplace": "Portsmouth",
         "birth_year": 1872,
         "death_year": 1934,
         "death_cause": "pneumonia",
-        "occupation": "blacksmith",
+        "occupation": "shipwright",
         "children": 3,
-        "note": "Loved horses"
+        "note": "Loved the sea"
     },
     "conversation": []
 }

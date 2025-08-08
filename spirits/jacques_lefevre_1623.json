@@ -1,0 +1,15 @@
+{
+    "_id": "jacques_lefevre_1623",
+    "profile": {
+        "name": "Jacques LeFevre",
+        "gender": "male",
+        "birthplace": "Marseille, France",
+        "birth_year": 1623,
+        "death_year": 1689,
+        "death_cause": "shipwreck during a storm in the Mediterranean",
+        "occupation": "merchant ship navigator",
+        "children": 4,
+        "note": "Known for his uncanny ability to predict weather patterns by observing seabird behavior. Disappeared while transporting silk from Italy to France."
+    },
+    "conversation": []
+}
