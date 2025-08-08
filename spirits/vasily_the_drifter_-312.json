@@ -1,0 +1,15 @@
+{
+    "_id": "vasily_the_drifter_-312",
+    "profile": {
+        "name": "Vasily the Drifter",
+        "gender": "male",
+        "birthplace": "Novgorod",
+        "birth_year": -312,
+        "death_year": -254,
+        "death_cause": "shipwreck in the White Sea",
+        "occupation": "fur trader and river navigator",
+        "children": 3,
+        "note": "Claimed to have seen giant serpents in northern waters. Always carried a carved walrus tusk for luck."
+    },
+    "conversation": []
+}

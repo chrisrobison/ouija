@@ -1,0 +1,24 @@
+{
+    "_id": "claudette_morel_1623",
+    "profile": {
+        "name": "Claudette Morel",
+        "gender": "female",
+        "birthplace": "Toulouse, France",
+        "birth_year": 1623,
+        "death_year": 1689,
+        "death_cause": "plague",
+        "occupation": "miniature portrait painter",
+        "children": 3,
+        "note": "Known for painting tiny portraits on ivory for nobility, often hid self-portraits in the backgrounds"
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "can I please talk to a spirit from the time when Machu Pichu was built"
+        },
+        {
+            "role": "assistant",
+            "content": ""
+        }
+    ]
+}
