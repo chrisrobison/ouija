@@ -44,11 +44,14 @@
     #conversation .question {
       text-align: right;
       margin: 5px 0;
+      color: #ff0;
     }
 
     #conversation .response {
       text-align: left;
       margin: 5px 0;
+      color: #0c0;
+      text-transform: uppercase;
     }
 
     #planchette {
@@ -144,6 +147,8 @@
   <div id="controls">
     <input type="text" id="message" placeholder="Type your message">
     <button onclick="startAnimation()">Ask</button>
+    <button onclick="showHelp(); return false;">?</button>
+    <button onclick="resetBoard(); return false;">۞</button>
   </div>
 
   <div id="main">
@@ -229,11 +234,14 @@
       }
     }
 
-    async function startAnimation() {
+    async function startAnimation(txt) {
       const msgInput = document.getElementById('message');
-      const text = msgInput.value.trim();
-      if (!text) return;
-      await askOuija(text);
+
+      if (!txt) {
+        txt = msgInput.value.trim();
+      }
+      if (!txt) return;
+      await askOuija(txt);
       msgInput.value = '';
     }
 
@@ -332,6 +340,13 @@
 </script>
 
   <script>
+    function showHelp() {
+        document.querySelector("#help-modal").style.display = "flex";
+    }
+    function resetBoard() {
+      fetch("ouija.php?action=reset");
+      addMessage("Hello");
+    }
     (() => {
       const modal = document.getElementById('help-modal');
       const closeBtn = document.getElementById('close-help');

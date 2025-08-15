@@ -35,6 +35,38 @@
         {
             "role": "assistant",
             "content": "Cold. Quiet. Like unfinished verse."
+        },
+        {
+            "role": "user",
+            "content": "are you there"
+        },
+        {
+            "role": "assistant",
+            "content": "Yes."
+        },
+        {
+            "role": "user",
+            "content": "what is it like on the other side?"
+        },
+        {
+            "role": "assistant",
+            "content": "Grey mist. Whispered poems. No paper."
+        },
+        {
+            "role": "user",
+            "content": "what is your name?"
+        },
+        {
+            "role": "assistant",
+            "content": "Li Xiaolong."
+        },
+        {
+            "role": "user",
+            "content": "can I speak with a different spirit"
+        },
+        {
+            "role": "assistant",
+            "content": ""
         }
     ]
 }
