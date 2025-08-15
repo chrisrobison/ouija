@@ -1,0 +1,15 @@
+{
+    "_id": "brother_cillian_o_duinn_1187",
+    "profile": {
+        "name": "Brother Cillian O'Duinn",
+        "gender": "male",
+        "birthplace": "Kilkenny, Ireland",
+        "birth_year": 1187,
+        "death_year": 1243,
+        "death_cause": "plague",
+        "occupation": "monastic scribe",
+        "children": 0,
+        "note": "Illuminated manuscripts with hidden pagan symbols in the margins"
+    },
+    "conversation": []
+}

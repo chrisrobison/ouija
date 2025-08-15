@@ -1,0 +1,15 @@
+{
+    "_id": "alistair_mactavish_1723",
+    "profile": {
+        "name": "Alistair MacTavish",
+        "gender": "male",
+        "birthplace": "Inverness, Scotland",
+        "birth_year": 1723,
+        "death_year": 1789,
+        "death_cause": "shipwreck",
+        "occupation": "whiskey merchant",
+        "children": 4,
+        "note": "Known for smuggling fine Highland whiskey to France during trade embargoes. Died when his ship 'The Heather Rose' sank in a storm off the Orkney Isles."
+    },
+    "conversation": []
+}

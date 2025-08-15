@@ -550,6 +550,7 @@ if ($action === 'ask') {
     if ($resetToken) {
         // Create and load a new spirit for subsequent requests
         $spirit = summon_new_spirit($API_KEY, $MODEL, $SYSTEM_PROMPT, $TEMPERATURE, $MAX_TOKENS, $SPIRITS_DIR, $CURRENT_FILE);
+        $response = "Yes";
     }
 
     // Output only the spirit's answer
