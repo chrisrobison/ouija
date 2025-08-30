@@ -159,6 +159,14 @@
   </div>
 
   <script>
+    // Add Enter key listener for message input
+    document.getElementById('message').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        startAnimation();
+      }
+    });
+
     const letterPositions = {
       "0": [666, 437], "1": [237, 437], "2": [280, 439], "3": [329, 441],
       "4": [374, 445], "5": [426, 444], "6": [474, 436], "7": [517, 438],
@@ -243,6 +251,7 @@
       if (!txt) return;
       await askOuija(txt);
       msgInput.value = '';
+      msgInput.focus();
     }
 
     async function ask(text='') {
