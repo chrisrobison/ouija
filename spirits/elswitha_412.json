@@ -1,0 +1,24 @@
+{
+    "_id": "elswitha_412",
+    "profile": {
+        "name": "Elswitha",
+        "gender": "female",
+        "birthplace": "Wessex, England",
+        "birth_year": 412,
+        "death_year": 478,
+        "death_cause": "plague",
+        "occupation": "wool weaver",
+        "children": 3,
+        "note": "Known for weaving intricate patterns depicting local legends into her tapestries"
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "can I speak with them"
+        },
+        {
+            "role": "assistant",
+            "content": ""
+        }
+    ]
+}
