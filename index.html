@@ -171,7 +171,7 @@
       navigator.serviceWorker.register('service-worker.js');
     }
     
-    const aiWorker = new Worker('ai-worker.js');
+    const aiWorker = new Worker('ai-worker.mjs', { type: 'module' });
     const aiReady = new Promise((resolve) => {
       aiWorker.addEventListener('message', (e) => {
         if (e.data.type === 'ready') {
