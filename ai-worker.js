@@ -1,4 +1,4 @@
-importScripts('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm/dist/index.min.js');
+importScripts('https://unpkg.com/@mlc-ai/web-llm@0.2.79/lib/index.js');
 
 let engine;
 
