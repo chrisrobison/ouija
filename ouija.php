@@ -1,7 +1,18 @@
 <?php
 /**
  * ouija.php
- * DeepSeek-backed Ouija “spirit” API with:
+ * DeepSeek-backed Ouija "spirit" API — DISABLED.
+ * The frontend now uses in-browser WebLLM (ai-worker.mjs) exclusively.
+ * This file is kept for reference only; all endpoints return 410 Gone.
+ */
+http_response_code(410);
+header('Content-Type: text/plain; charset=utf-8');
+echo 'This API has been shut down. The Ouija board now runs entirely in your browser.';
+exit;
+
+/**
+ * (original code below, preserved for reference)
+ * DeepSeek-backed Ouija "spirit" API with:
  * - Disk-persisted spirit profiles
  * - Per-spirit conversation memory
  * - Switchable “host” spirit

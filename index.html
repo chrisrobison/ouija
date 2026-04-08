@@ -72,6 +72,27 @@
       margin-top: 20px;
     }
 
+    #spirit-manager {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      color: #ccc;
+      font-size: 0.9em;
+    }
+
+    #spirit-manager select {
+      flex: 1;
+      background: #111;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 4px;
+    }
+
+    #spirit-manager button {
+      padding: 4px 8px;
+    }
+
     input[type="text"] {
       font-size: 1.2em;
       padding: 5px;
@@ -102,18 +123,16 @@
       }
     }
 
+    /* ── Help modal ─────────────────────────────────────────────────────────── */
     #help-modal {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0, 0, 0, 0.8);
       color: #fff;
       display: flex;
       justify-content: center;
       align-items: center;
-      z-index: 100;
+      z-index: 200;
     }
 
     #help-modal .content {
@@ -127,9 +146,85 @@
     #help-modal button {
       margin-top: 10px;
     }
+
+    /* ── Loading overlay ─────────────────────────────────────────────────────── */
+    #loading-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.96);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      text-align: center;
+      padding: 20px;
+    }
+
+    #loading-overlay h2 {
+      font-family: 'Georgia', serif;
+      color: #c17f3b;
+      font-size: 1.8em;
+      margin-bottom: 24px;
+      text-shadow: 0 0 20px rgba(193, 127, 59, 0.5);
+    }
+
+    #progress-bar-wrap {
+      width: 420px;
+      max-width: 90vw;
+      height: 6px;
+      background: #2a2a2a;
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #6b0000, #c17f3b);
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    #loading-pct {
+      color: #c17f3b;
+      font-size: 0.85em;
+      margin: 4px 0 14px;
+      min-height: 1.1em;
+    }
+
+    #loading-status {
+      color: #777;
+      font-size: 0.9em;
+      font-style: italic;
+      max-width: 420px;
+    }
+
+    /* ── Spirit info bar ─────────────────────────────────────────────────────── */
+    #spirit-bar {
+      color: #555;
+      font-size: 0.82em;
+      margin: 8px 0 0;
+      min-height: 1.2em;
+      letter-spacing: 0.04em;
+    }
+
+    #spirit-bar .spirit-name {
+      color: #c17f3b;
+    }
   </style>
 </head>
 <body>
+
+  <!-- Loading overlay — shown until model + first spirit are ready -->
+  <div id="loading-overlay">
+    <h2>☽ The Veil Between Worlds Opens ☾</h2>
+    <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+    <div id="loading-pct"></div>
+    <div id="loading-status">Preparing the spirit medium…</div>
+  </div>
 
   <div id="help-modal">
     <div class="content">
@@ -137,19 +232,32 @@
       <p>Ask your questions by typing them in the box or by speaking while holding the planchette.</p>
       <ul>
         <li>Click and hold the planchette to speak a question.</li>
-        <li>Or type your question and press "Ask".</li>
+        <li>Or type your question and press "Ask" or Enter.</li>
         <li>The planchette will move to spell out the spirit's response.</li>
+        <li>Press ۞ to dismiss the current spirit and summon a new one.</li>
+        <li>Use the Saved spirits menu to revisit or switch between prior spirits.</li>
+        <li>All AI runs entirely in your browser — no data is sent to any server.</li>
       </ul>
       <button id="close-help">Close</button>
     </div>
   </div>
 
   <div id="controls">
-    <input type="text" id="message" placeholder="Type your message">
+    <input type="text" id="message" placeholder="Type your question…">
     <button onclick="startAnimation()">Ask</button>
     <button onclick="showHelp(); return false;">?</button>
-    <button onclick="resetBoard(); return false;">۞</button>
+    <button id="reset-btn" onclick="resetBoard(); return false;">۞</button>
   </div>
+
+  <div id="spirit-manager">
+    <span>Saved spirits:</span>
+    <select id="spirit-select">
+      <option value="">Select saved spirit…</option>
+    </select>
+    <button id="spirit-refresh" title="Refresh known spirits">⟳</button>
+  </div>
+
+  <div id="spirit-bar">Awaiting the spirits…</div>
 
   <div id="main">
     <div id="board-container">
@@ -159,28 +267,224 @@
   </div>
 
   <script>
-    // Add Enter key listener for message input
-    document.getElementById('message').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        startAnimation();
-      }
-    });
-    
+    // ── Service worker & worker setup ─────────────────────────────────────────
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js');
     }
-    
+
     const aiWorker = new Worker('ai-worker.mjs', { type: 'module' });
-    const aiReady = new Promise((resolve) => {
-      aiWorker.addEventListener('message', (e) => {
-        if (e.data.type === 'ready') {
-          resolve();
+
+    // workerReady / pendingReadyResolve let us await the worker being ready
+    // and re-await after a reset without creating a new Worker object.
+    let pendingReadyResolve = null;
+    function createReadyPromise() {
+      return new Promise((resolve) => { pendingReadyResolve = resolve; });
+    }
+    let aiReady = createReadyPromise();
+
+    let workerRequestSeq = 1;
+    const pendingWorkerRequests = new Map();
+
+    const spiritSelect = document.getElementById('spirit-select');
+    const spiritRefreshBtn = document.getElementById('spirit-refresh');
+    let knownSpirits = [];
+    let currentSpiritId = null;
+    const SPIRIT_REQUEST_KEYWORDS = ['talk', 'speak', 'summon', 'switch', 'contact', 'call'];
+    let pendingSpiritNotices = [];
+
+    function callWorker(type, payload = {}) {
+      return new Promise((resolve, reject) => {
+        const requestId = workerRequestSeq++;
+        pendingWorkerRequests.set(requestId, { resolve, reject });
+        aiWorker.postMessage({ ...payload, type, requestId });
+      });
+    }
+
+    const spiritAPI = {
+      listSpirits: () => callWorker('list-spirits').then((res) => res.spirits || []),
+      switchSpirit: (id) => callWorker('switch-spirit', { spiritId: id }),
+      getHistory: (id) => callWorker('spirit-history', { spiritId: id }).then((res) => res.history || []),
+      getProfile: (id) => callWorker('spirit-profile', { spiritId: id }).then((res) => res.spirit),
+    };
+
+    function flushSpiritNotices() {
+      if (pendingSpiritNotices.length === 0) return;
+      const notices = pendingSpiritNotices.splice(0);
+      notices.forEach((fn) => {
+        try {
+          fn();
+        } catch (err) {
+          console.error('Failed to render spirit notice', err);
         }
       });
+    }
+
+    async function refreshSpiritOptions({ maintainSelection = true } = {}) {
+      try {
+        const spirits = await spiritAPI.listSpirits();
+        knownSpirits = spirits;
+        const previousValue = maintainSelection ? (currentSpiritId || spiritSelect.value) : '';
+        spiritSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select saved spirit…';
+        spiritSelect.appendChild(placeholder);
+        spirits.forEach((rec) => {
+          const opt = document.createElement('option');
+          opt.value = rec._id;
+          opt.textContent = rec.spirit?.name || rec._id;
+          spiritSelect.appendChild(opt);
+        });
+        if (currentSpiritId) {
+          spiritSelect.value = currentSpiritId;
+        } else {
+          spiritSelect.value = previousValue || '';
+        }
+      } catch (err) {
+        console.warn('Unable to refresh spirit list:', err);
+      }
+    }
+
+    async function loadConversationForCurrentSpirit(spiritId) {
+      clearConversation();
+      if (!spiritId) {
+        flushSpiritNotices();
+        return;
+      }
+      try {
+        const history = await spiritAPI.getHistory(spiritId);
+        history.forEach((entry) => {
+          addMessage(entry.role === 'assistant' ? 'response' : 'question', entry.content);
+        });
+      } catch (err) {
+        console.warn('Unable to load spirit history:', err);
+      } finally {
+        flushSpiritNotices();
+      }
+    }
+
+    async function ensureSpiritsKnown() {
+      if (!knownSpirits.length) {
+        await refreshSpiritOptions();
+      }
+    }
+
+    function findSpiritRecord(id) {
+      return knownSpirits.find((rec) => rec._id === id);
+    }
+
+    function matchSpiritByName(nameFragment) {
+      const target = nameFragment.trim().toLowerCase();
+      if (!target) return null;
+      return knownSpirits.find((rec) => rec.spirit?.name?.toLowerCase().includes(target)) || null;
+    }
+
+    function detectRequestedSpirit(question) {
+      const lower = question.toLowerCase();
+      const commandMatch = lower.match(/^(?:[#@\/]?spirit[:\s]+)(.+)$/i);
+      if (commandMatch) {
+        return matchSpiritByName(commandMatch[1]);
+      }
+      const keywordHit = SPIRIT_REQUEST_KEYWORDS.some((kw) => lower.includes(kw));
+      if (!keywordHit) return null;
+      return knownSpirits.find((rec) => {
+        const name = rec.spirit?.name?.toLowerCase();
+        return name && lower.includes(name);
+      }) || null;
+    }
+
+    async function switchToSpirit(spiritId) {
+      if (!spiritId || spiritId === currentSpiritId) return null;
+      try {
+        aiReady = createReadyPromise();
+        const result = await spiritAPI.switchSpirit(spiritId);
+        await aiReady;
+        await refreshSpiritOptions({ maintainSelection: true });
+        return result.spirit || findSpiritRecord(spiritId)?.spirit || null;
+      } catch (err) {
+        console.error('Unable to switch spirit:', err);
+        addMessage('response', `Unable to switch spirits: ${err.message}`);
+        return null;
+      }
+    }
+
+    spiritSelect.addEventListener('change', async (e) => {
+      const spiritId = e.target.value;
+      if (!spiritId || spiritId === currentSpiritId) return;
+      const record = findSpiritRecord(spiritId);
+      pendingSpiritNotices.push(() => {
+        addMessage('response', `Communing with ${record?.spirit?.name || 'that spirit'} via selector.`);
+      });
+      await switchToSpirit(spiritId);
     });
+
+    spiritRefreshBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      refreshSpiritOptions({ maintainSelection: true });
+    });
+
+    // ── Central worker message handler ────────────────────────────────────────
+    // Handles lifecycle messages (progress, status, ready, error).
+    // Per-question 'answer'/'error' messages are caught by per-call handlers in askOuija.
+    aiWorker.addEventListener('message', (e) => {
+      if (typeof e.data.replyTo !== 'undefined') {
+        const pending = pendingWorkerRequests.get(e.data.replyTo);
+        if (pending) {
+          pendingWorkerRequests.delete(e.data.replyTo);
+          if (e.data.error) pending.reject(new Error(e.data.error));
+          else pending.resolve(e.data);
+        }
+        return;
+      }
+
+      const { type } = e.data;
+
+      if (type === 'progress') {
+        const pct = Math.round((e.data.value ?? 0) * 100);
+        document.getElementById('progress-bar').style.width = pct + '%';
+        document.getElementById('loading-pct').textContent = pct + '%';
+        if (e.data.text) {
+          document.getElementById('loading-status').textContent = e.data.text;
+        }
+
+      } else if (type === 'status') {
+        document.getElementById('loading-status').textContent = e.data.message;
+        // Spirit summoning happens after 100% download — pulse bar
+        document.getElementById('progress-bar').style.width = '100%';
+        document.getElementById('loading-pct').textContent = '';
+
+      } else if (type === 'ready') {
+        document.getElementById('loading-overlay').style.display = 'none';
+        if (e.data.spirit) {
+          currentSpiritId = e.data.spirit._id || null;
+          showSpirit(e.data.spirit);
+          loadConversationForCurrentSpirit(currentSpiritId);
+          refreshSpiritOptions({ maintainSelection: true });
+        } else {
+          flushSpiritNotices();
+        }
+        if (pendingReadyResolve) {
+          pendingReadyResolve();
+          pendingReadyResolve = null;
+        }
+
+      } else if (type === 'error') {
+        document.getElementById('loading-status').textContent = '⚠ ' + e.data.error;
+      }
+    });
+
     aiWorker.postMessage({ type: 'init' });
 
+    // ── Spirit info bar ───────────────────────────────────────────────────────
+    function showSpirit(spirit) {
+      const bar = document.getElementById('spirit-bar');
+      bar.innerHTML =
+        `Speaking with <span class="spirit-name">${spirit.name}</span>` +
+        ` · ${spirit.occupation}, ${spirit.birthplace}` +
+        ` · ${spirit.birth_year}–${spirit.death_year}`;
+    }
+
+    // ── Board letter positions ────────────────────────────────────────────────
     const letterPositions = {
       "0": [666, 437], "1": [237, 437], "2": [280, 439], "3": [329, 441],
       "4": [374, 445], "5": [426, 444], "6": [474, 436], "7": [517, 438],
@@ -195,40 +499,32 @@
     };
 
     const planchette = document.getElementById('planchette');
-    const board = document.getElementById('board-container');
+    const board     = document.getElementById('board-container');
 
     window.addEventListener('load', () => {
-      // Default to GOODBYE position (center-bottom of board)
       const [x, y] = letterPositions['GOODBYE'];
-
-      const scaleX = board.clientWidth / 900;
+      const scaleX = board.clientWidth  / 900;
       const scaleY = board.clientHeight / 600;
-      const width = planchette.offsetWidth;
-      const height = planchette.offsetHeight;
-
-      planchette.style.left = `${x * scaleX - width / 2}px`;
-      planchette.style.top = `${((y * scaleY - height) / 2) }px`;
+      planchette.style.left = `${x * scaleX - planchette.offsetWidth  / 2}px`;
+      planchette.style.top  = `${(y * scaleY - planchette.offsetHeight) / 2}px`;
     });
 
     board.addEventListener('contextmenu', e => e.preventDefault());
 
     async function moveTo(x, y) {
-      const scaleX = board.clientWidth / 900;
+      const scaleX = board.clientWidth  / 900;
       const scaleY = board.clientHeight / 600;
-      const width = planchette.offsetWidth;
-      const height = planchette.offsetHeight;
-
-      const holeOffsetX = 100; // adjust as needed
-      const holeOffsetY = 100;
-
-      planchette.style.left = `${x * scaleX - holeOffsetX * (scaleX)}px`;
-      planchette.style.top = `${y * scaleY - holeOffsetY * (scaleY)}px`;
-
+      planchette.style.left = `${x * scaleX - 100 * scaleX}px`;
+      planchette.style.top  = `${y * scaleY - 100 * scaleY}px`;
       return new Promise(resolve => setTimeout(resolve, 850));
     }
 
-
+    // ── Conversation display ──────────────────────────────────────────────────
     const convo = document.getElementById('conversation');
+
+    function clearConversation() {
+      convo.innerHTML = '';
+    }
 
     function addMessage(type, text) {
       const div = document.createElement('div');
@@ -238,10 +534,27 @@
       convo.scrollTop = convo.scrollHeight;
     }
 
+    // ── Core question → spirit response flow ──────────────────────────────────
     async function askOuija(question) {
-      addMessage('question', question);
       try {
+        await ensureSpiritsKnown();
+        const requestedSpirit = detectRequestedSpirit(question);
+        if (requestedSpirit && requestedSpirit._id !== currentSpiritId) {
+          document.getElementById('spirit-bar').innerHTML = '<em style="color:#777">Summoning requested spirit…</em>';
+          pendingSpiritNotices.push(() => {
+            addMessage('question', question);
+            addMessage('response', `${requestedSpirit.spirit?.name || 'The spirit'} is now present. Ask your question.`);
+          });
+          const switched = await switchToSpirit(requestedSpirit._id);
+          if (!switched) {
+            flushSpiritNotices();
+          }
+          return;
+        }
+
+        addMessage('question', question);
         await aiReady;
+
         const answer = await new Promise((resolve, reject) => {
           function handler(e) {
             if (e.data.type === 'answer') {
@@ -255,27 +568,33 @@
           aiWorker.addEventListener('message', handler);
           aiWorker.postMessage({ type: 'question', question });
         });
+
+        // Strip any characters the board can't spell out, then animate
         const cleaned = answer.replace(/[^A-Za-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
         await ask(cleaned);
         addMessage('response', cleaned);
+
       } catch (err) {
-        console.error('Ouija worker failed:', err);
+        console.error('Spirit failed to respond:', err);
+        addMessage('response', 'THE SPIRITS ARE SILENT');
       }
     }
 
+    // Expose globally so the speech-recognition script can reach it
+    window.askOuija = askOuija;
+    window.ouijaControl = spiritAPI;
+    console.info('Spiritual archives ready. Try ouijaControl.listSpirits() in the console.');
+
     async function startAnimation(txt) {
       const msgInput = document.getElementById('message');
-
-      if (!txt) {
-        txt = msgInput.value.trim();
-      }
+      if (!txt) txt = msgInput.value.trim();
       if (!txt) return;
       await askOuija(txt);
       msgInput.value = '';
       msgInput.focus();
     }
 
-    async function ask(text='') {
+    async function ask(text = '') {
       const tokens = text.toUpperCase().split(/\s+/).filter(t => t);
       for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
@@ -283,113 +602,108 @@
           await moveTo(...letterPositions[token]);
         } else {
           for (const char of token.split('')) {
-            const target = letterPositions[char] || letterPositions[' '];
-            await moveTo(...target);
+            await moveTo(...(letterPositions[char] || letterPositions[' ']));
           }
         }
-        if (i < tokens.length - 1) {
-          await moveTo(...letterPositions[' ']);
-        }
+        if (i < tokens.length - 1) await moveTo(...letterPositions[' ']);
       }
       await moveTo(...letterPositions['GOODBYE']);
     }
+
+    // Enter key shortcut
+    document.getElementById('message').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); startAnimation(); }
+    });
   </script>
-  <script>
-(() => {
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Recognition) {
-    console.warn('Web Speech API not supported.');
-    return;
-  }
-
-  const rec = new Recognition();
-  rec.lang = 'en-US';
-  rec.continuous = true;
-  rec.interimResults = true;
-
-  const planchetteEl = document.getElementById('planchette');
-  let listening = false;
-
-  function startListening() {
-    listening = true;
-    try { rec.start(); } catch (_) {}
-  }
-
-  function stopListening() {
-    listening = false;
-    try { rec.stop(); } catch (_) {}
-  }
-
-  planchetteEl.addEventListener('pointerdown', startListening);
-  planchetteEl.addEventListener('pointerup', stopListening);
-  planchetteEl.addEventListener('pointerleave', stopListening);
-  planchetteEl.addEventListener('contextmenu', e => e.preventDefault());
-  planchetteEl.addEventListener('touchstart', e => e.preventDefault(), {passive: false});
-
-  let buffer = '';
-  let lastFinalAt = 0;
-  const FLUSH_AFTER_MS = 1200; // send after ~1.2s of silence
-
-  rec.onresult = (e) => {
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) {
-        buffer += (buffer ? ' ' : '') + t.trim();
-        lastFinalAt = Date.now();
-        flush(); // push immediately on final chunks
-      } else {
-        // if you want interim-on-board, you could push here too (probably noisy)
-      }
-    }
-  };
-
-  rec.onend = () => {
-    if (listening) {
-      try { rec.start(); } catch (_) {}
-    }
-  };
-
-  function flush() {
-    const text = buffer.trim();
-    if (!text) return;
-
-    if (typeof window.askOuija === 'function') {
-      window.askOuija(text);
-    } else {
-      console.warn('Ouija handler not available:', text);
-    }
-    buffer = '';
-  }
-
-  // safety net: if we got some words but no finals, push after a pause
-  setInterval(() => {
-    if (buffer && Date.now() - lastFinalAt > FLUSH_AFTER_MS) flush();
-  }, 500);
-
-})();
-</script>
 
   <script>
-    function showHelp() {
-        document.querySelector("#help-modal").style.display = "flex";
-    }
-    function resetBoard() {
-      fetch("ouija.php?action=reset");
-      addMessage("Hello");
-    }
+    // ── Speech recognition (hold planchette to speak) ─────────────────────────
     (() => {
-      const modal = document.getElementById('help-modal');
+      const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Recognition) { console.warn('Web Speech API not supported.'); return; }
+
+      const rec = new Recognition();
+      rec.lang = 'en-US';
+      rec.continuous = true;
+      rec.interimResults = true;
+
+      const planchetteEl = document.getElementById('planchette');
+      let listening = false;
+
+      function startListening() { listening = true;  try { rec.start(); } catch (_) {} }
+      function stopListening()  { listening = false; try { rec.stop();  } catch (_) {} }
+
+      planchetteEl.addEventListener('pointerdown',  startListening);
+      planchetteEl.addEventListener('pointerup',    stopListening);
+      planchetteEl.addEventListener('pointerleave', stopListening);
+      planchetteEl.addEventListener('contextmenu',  e => e.preventDefault());
+      planchetteEl.addEventListener('touchstart',   e => e.preventDefault(), { passive: false });
+
+      let buffer = '';
+      let lastFinalAt = 0;
+      const FLUSH_AFTER_MS = 1200;
+
+      rec.onresult = (e) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) {
+            buffer += (buffer ? ' ' : '') + t.trim();
+            lastFinalAt = Date.now();
+            flush();
+          }
+        }
+      };
+
+      rec.onend = () => { if (listening) try { rec.start(); } catch (_) {} };
+
+      function flush() {
+        const text = buffer.trim();
+        if (!text) return;
+        if (typeof window.askOuija === 'function') window.askOuija(text);
+        else console.warn('Ouija handler not ready:', text);
+        buffer = '';
+      }
+
+      setInterval(() => {
+        if (buffer && Date.now() - lastFinalAt > FLUSH_AFTER_MS) flush();
+      }, 500);
+    })();
+  </script>
+
+  <script>
+    // ── Help modal ────────────────────────────────────────────────────────────
+    function showHelp() {
+      document.getElementById('help-modal').style.display = 'flex';
+    }
+
+    // ── Reset: dismiss current spirit and summon a new one ────────────────────
+    function resetBoard() {
+      const btn = document.getElementById('reset-btn');
+      btn.disabled = true;
+      document.getElementById('spirit-bar').innerHTML = '<em style="color:#777">Summoning a new spirit…</em>';
+
+      // Replace aiReady with a new promise so askOuija() will wait for the new spirit
+      aiReady = createReadyPromise();
+      aiWorker.postMessage({ type: 'reset' });
+
+      // Re-enable the button once the new spirit is ready
+      aiReady.then(() => { btn.disabled = false; });
+    }
+
+    (() => {
+      const modal   = document.getElementById('help-modal');
       const closeBtn = document.getElementById('close-help');
+
+      // Hide modal on return visits; show it on first visit
       if (localStorage.getItem('helpShown')) {
         modal.style.display = 'none';
       }
+
       closeBtn.addEventListener('click', () => {
         modal.style.display = 'none';
         localStorage.setItem('helpShown', 'true');
       });
-      
     })();
-
   </script>
 
 </body>
