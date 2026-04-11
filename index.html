@@ -214,6 +214,90 @@
     #spirit-bar .spirit-name {
       color: #c17f3b;
     }
+
+    #runtime-bar {
+      color: #666;
+      font-size: 0.78em;
+      margin-top: 4px;
+      min-height: 1.1em;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Settings modal ─────────────────────────────────────────────────────── */
+    #settings-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.84);
+      color: #ddd;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1201;
+    }
+
+    #settings-modal .content {
+      background: #1c1c1c;
+      border: 1px solid #555;
+      width: 640px;
+      max-width: 92vw;
+      max-height: 88vh;
+      overflow: auto;
+      padding: 18px;
+      box-sizing: border-box;
+    }
+
+    #settings-modal h2 {
+      margin: 0 0 10px;
+      color: #c17f3b;
+      font-family: Georgia, serif;
+    }
+
+    #settings-modal p.help {
+      margin: 0 0 12px;
+      color: #aaa;
+      font-size: 0.9em;
+    }
+
+    #settings-modal label {
+      display: block;
+      margin: 10px 0 5px;
+      color: #bbb;
+      font-size: 0.9em;
+    }
+
+    #settings-modal select,
+    #settings-modal input {
+      width: 100%;
+      background: #0f0f0f;
+      color: #fff;
+      border: 1px solid #3f3f3f;
+      padding: 6px 8px;
+      box-sizing: border-box;
+    }
+
+    #settings-modal .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+
+    #settings-modal .panel {
+      border: 1px solid #333;
+      padding: 10px;
+      margin-top: 10px;
+      background: #131313;
+    }
+
+    #settings-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+    }
   </style>
 </head>
 <body>
@@ -242,10 +326,56 @@
     </div>
   </div>
 
+  <div id="settings-modal">
+    <div class="content">
+      <h2>Settings</h2>
+      <p class="help">Choose a local WebLLM model or use an OpenAI-compatible endpoint.</p>
+
+      <label for="settings-provider">Provider</label>
+      <select id="settings-provider">
+        <option value="webllm">Local (WebLLM in browser)</option>
+        <option value="openai-compatible">OpenAI-compatible endpoint</option>
+      </select>
+
+      <div id="settings-webllm-panel" class="panel">
+        <label for="settings-webllm-model">Local model</label>
+        <select id="settings-webllm-model"></select>
+        <div class="row">
+          <div>
+            <label for="settings-webllm-custom">Custom local model ID</label>
+            <input id="settings-webllm-custom" type="text" placeholder="Example: Qwen3.5-2B-q4f16_1-MLC">
+          </div>
+          <button id="settings-webllm-add" type="button">Add</button>
+        </div>
+      </div>
+
+      <div id="settings-endpoint-panel" class="panel">
+        <label for="settings-distill-preset">Distilled model presets (Hugging Face names)</label>
+        <select id="settings-distill-preset"></select>
+        <button id="settings-distill-use" type="button" style="margin-top:8px;">Use selected preset</button>
+
+        <label for="settings-endpoint-url">Endpoint base URL</label>
+        <input id="settings-endpoint-url" type="text" placeholder="https://your-host/v1">
+
+        <label for="settings-endpoint-model">Endpoint model</label>
+        <input id="settings-endpoint-model" type="text" placeholder="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B">
+
+        <label for="settings-endpoint-key">API key (optional)</label>
+        <input id="settings-endpoint-key" type="password" placeholder="sk-...">
+      </div>
+
+      <div id="settings-actions">
+        <button id="settings-cancel" type="button">Cancel</button>
+        <button id="settings-save" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
   <div id="controls">
     <input type="text" id="message" placeholder="Type your question…">
     <button onclick="startAnimation()">Ask</button>
     <button onclick="showHelp(); return false;">?</button>
+    <button onclick="showSettings(); return false;" title="Model and endpoint settings">⚙</button>
     <button id="reset-btn" onclick="resetBoard(); return false;">۞</button>
   </div>
 
@@ -258,6 +388,7 @@
   </div>
 
   <div id="spirit-bar">Awaiting the spirits…</div>
+  <div id="runtime-bar">Model: loading…</div>
 
   <div id="main">
     <div id="board-container">
@@ -306,6 +437,118 @@
       getHistory: (id) => callWorker('spirit-history', { spiritId: id }).then((res) => res.history || []),
       getProfile: (id) => callWorker('spirit-profile', { spiritId: id }).then((res) => res.spirit),
     };
+
+    const runtimeAPI = {
+      getSettings: () => callWorker('get-settings'),
+      applySettings: (settings) => callWorker('apply-settings', { settings }),
+    };
+
+    const runtimeBar = document.getElementById('runtime-bar');
+    const loadingOverlay = document.getElementById('loading-overlay');
+
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsProvider = document.getElementById('settings-provider');
+    const settingsWebllmPanel = document.getElementById('settings-webllm-panel');
+    const settingsEndpointPanel = document.getElementById('settings-endpoint-panel');
+    const settingsWebllmModel = document.getElementById('settings-webllm-model');
+    const settingsWebllmCustom = document.getElementById('settings-webllm-custom');
+    const settingsWebllmAdd = document.getElementById('settings-webllm-add');
+    const settingsDistillPreset = document.getElementById('settings-distill-preset');
+    const settingsDistillUse = document.getElementById('settings-distill-use');
+    const settingsEndpointUrl = document.getElementById('settings-endpoint-url');
+    const settingsEndpointModel = document.getElementById('settings-endpoint-model');
+    const settingsEndpointKey = document.getElementById('settings-endpoint-key');
+    const settingsCancel = document.getElementById('settings-cancel');
+    const settingsSave = document.getElementById('settings-save');
+
+    let availableWebllmModels = [];
+    let availableEndpointDistilled = [];
+    let workerInitialized = false;
+
+    function updateRuntimeBar(runtime) {
+      if (!runtime) return;
+      if (runtime.provider === 'openai-compatible') {
+        const endpoint = runtime.baseUrl ? ` @ ${runtime.baseUrl}` : '';
+        runtimeBar.textContent = `Provider: endpoint · Model: ${runtime.model || '(unset)'}${endpoint}`;
+      } else {
+        runtimeBar.textContent = `Provider: local WebLLM · Model: ${runtime.model || '(unset)'}`;
+      }
+    }
+
+    function refreshSettingsPanels() {
+      const endpointMode = settingsProvider.value === 'openai-compatible';
+      settingsWebllmPanel.style.display = endpointMode ? 'none' : 'block';
+      settingsEndpointPanel.style.display = endpointMode ? 'block' : 'none';
+    }
+
+    function refillSelect(selectEl, options, selected) {
+      selectEl.innerHTML = '';
+      options.forEach((opt) => {
+        const option = document.createElement('option');
+        option.value = opt.id;
+        option.textContent = opt.approxParams ? `${opt.label} [${opt.approxParams}]` : opt.label;
+        selectEl.appendChild(option);
+      });
+      if (selected) {
+        selectEl.value = selected;
+      }
+    }
+
+    function addLocalModelOption(id) {
+      const modelId = String(id || '').trim();
+      if (!modelId) return;
+      const exists = availableWebllmModels.some((m) => m.id === modelId);
+      if (!exists) {
+        availableWebllmModels.push({ id: modelId, label: modelId, approxParams: 'custom' });
+      }
+      refillSelect(settingsWebllmModel, availableWebllmModels, modelId);
+    }
+
+    function showSettings() {
+      settingsModal.style.display = 'flex';
+    }
+
+    function hideSettings() {
+      settingsModal.style.display = 'none';
+    }
+
+    function collectSettingsFromUI() {
+      const provider = settingsProvider.value === 'openai-compatible' ? 'openai-compatible' : 'webllm';
+      return {
+        provider,
+        webllmModel: settingsWebllmModel.value,
+        openai: {
+          baseUrl: settingsEndpointUrl.value.trim(),
+          model: settingsEndpointModel.value.trim(),
+          apiKey: settingsEndpointKey.value.trim(),
+        },
+      };
+    }
+
+    function applySettingsToUI(payload) {
+      availableWebllmModels = [...(payload.webllmModels || [])];
+      availableEndpointDistilled = [...(payload.endpointDistilledModels || [])];
+
+      const settings = payload.settings || {};
+      const openai = settings.openai || {};
+
+      if (settings.webllmModel && !availableWebllmModels.some((m) => m.id === settings.webllmModel)) {
+        availableWebllmModels.push({
+          id: settings.webllmModel,
+          label: settings.webllmModel,
+          approxParams: 'custom',
+        });
+      }
+
+      refillSelect(settingsWebllmModel, availableWebllmModels, settings.webllmModel);
+      refillSelect(settingsDistillPreset, availableEndpointDistilled, openai.model);
+      settingsProvider.value = settings.provider || 'webllm';
+      settingsEndpointUrl.value = openai.baseUrl || '';
+      settingsEndpointModel.value = openai.model || '';
+      settingsEndpointKey.value = openai.apiKey || '';
+      refreshSettingsPanels();
+      updateRuntimeBar(payload.runtime);
+    }
 
     function flushSpiritNotices() {
       if (pendingSpiritNotices.length === 0) return;
@@ -423,6 +666,66 @@
       refreshSpiritOptions({ maintainSelection: true });
     });
 
+    settingsProvider.addEventListener('change', refreshSettingsPanels);
+
+    settingsWebllmAdd.addEventListener('click', () => {
+      addLocalModelOption(settingsWebllmCustom.value);
+      settingsWebllmCustom.value = '';
+    });
+
+    settingsDistillUse.addEventListener('click', () => {
+      if (settingsDistillPreset.value) {
+        settingsEndpointModel.value = settingsDistillPreset.value;
+      }
+    });
+
+    settingsCancel.addEventListener('click', () => {
+      hideSettings();
+      if (!workerInitialized) {
+        workerInitialized = true;
+        aiWorker.postMessage({ type: 'init' });
+      }
+    });
+
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) {
+        hideSettings();
+      }
+    });
+
+    settingsSave.addEventListener('click', async () => {
+      const nextSettings = collectSettingsFromUI();
+      settingsSave.disabled = true;
+      loadingOverlay.style.display = 'flex';
+      document.getElementById('loading-status').textContent =
+        nextSettings.provider === 'openai-compatible'
+          ? 'Connecting endpoint…'
+          : `Loading ${nextSettings.webllmModel}…`;
+      document.getElementById('loading-pct').textContent = '';
+      document.getElementById('progress-bar').style.width = '0%';
+
+      try {
+        const result = await runtimeAPI.applySettings(nextSettings);
+        applySettingsToUI(result);
+        hideSettings();
+        if (!workerInitialized) {
+          workerInitialized = true;
+          aiWorker.postMessage({ type: 'init' });
+        } else {
+          loadingOverlay.style.display = 'none';
+          if (pendingReadyResolve) {
+            pendingReadyResolve();
+            pendingReadyResolve = null;
+          }
+        }
+      } catch (err) {
+        document.getElementById('loading-status').textContent = '⚠ ' + err.message;
+        addMessage('response', `SETTINGS ERROR: ${err.message}`);
+      } finally {
+        settingsSave.disabled = false;
+      }
+    });
+
     // ── Central worker message handler ────────────────────────────────────────
     // Handles lifecycle messages (progress, status, ready, error).
     // Per-question 'answer'/'error' messages are caught by per-call handlers in askOuija.
@@ -455,6 +758,9 @@
 
       } else if (type === 'ready') {
         document.getElementById('loading-overlay').style.display = 'none';
+        if (e.data.runtime) {
+          updateRuntimeBar(e.data.runtime);
+        }
         if (e.data.spirit) {
           currentSpiritId = e.data.spirit._id || null;
           showSpirit(e.data.spirit);
@@ -468,12 +774,38 @@
           pendingReadyResolve = null;
         }
 
+      } else if (type === 'runtime-updated') {
+        if (e.data.runtime) {
+          updateRuntimeBar(e.data.runtime);
+        }
+        document.getElementById('loading-overlay').style.display = 'none';
+        if (pendingReadyResolve) {
+          pendingReadyResolve();
+          pendingReadyResolve = null;
+        }
+
       } else if (type === 'error') {
         document.getElementById('loading-status').textContent = '⚠ ' + e.data.error;
       }
     });
 
-    aiWorker.postMessage({ type: 'init' });
+    (async () => {
+      try {
+        const settingsPayload = await runtimeAPI.getSettings();
+        applySettingsToUI(settingsPayload);
+        if (settingsPayload.firstRun) {
+          document.getElementById('loading-status').textContent = 'Choose a model to begin.';
+          showSettings();
+        } else {
+          workerInitialized = true;
+          aiWorker.postMessage({ type: 'init' });
+        }
+      } catch (err) {
+        document.getElementById('loading-status').textContent = '⚠ Failed to load settings: ' + err.message;
+        workerInitialized = true;
+        aiWorker.postMessage({ type: 'init' });
+      }
+    })();
 
     // ── Spirit info bar ───────────────────────────────────────────────────────
     function showSpirit(spirit) {
