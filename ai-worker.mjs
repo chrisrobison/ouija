@@ -1,5 +1,5 @@
 // ai-worker.mjs — In-browser spirit medium powered by WebLLM
-import { CreateMLCEngine } from './node_modules/@mlc-ai/web-llm/lib/index.js';
+import { CreateMLCEngine } from 'https://esm.run/@mlc-ai/web-llm';
 import * as storage from './worker-storage.mjs';
 
 // 8B parameters, q4f16_1 is more memory-efficient than q4f32_1 while keeping the same quality
